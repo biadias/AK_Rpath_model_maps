@@ -44,22 +44,7 @@ Modeling group for Ecopath and Atlantis
 
 ```{r AK_ESR, echo = FALSE, warning = FALSE, include=FALSE}
 
-#Alaska polygon
-AKpoly <- read_sf("shapefiles/AKpoly.shp")
-AKpoly <- st_transform(x = AKpoly, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
-
-fgdb <- "AK_Crab_Management_Areas.gdb"
-
-# List all feature classes in a file geodatabase
-subset(ogrDrivers(), grepl("GDB", name))
-fc_list <- ogrListLayers(fgdb)
-
-fc <- readOGR(dsn=fgdb,layer="Alaska_Marine_Areas_AK_prj")
-
-fc2 <- spTransform(x = fc, CRS("+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs"))
-
-AKmngtArea <- st_as_sf(fc2)
-AKmngtA <- st_transform(AKmngtArea, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+nmfs <- st_read("shapefiles/gf95_nmfs/gf95_nmfs.shp")
 
 #All the information from ESR
 

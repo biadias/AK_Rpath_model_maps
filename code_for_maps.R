@@ -29,19 +29,7 @@ library(magick)
 AKpoly <- read_sf("shapefiles/AKpoly.shp")
 AKpoly <- st_transform(x = AKpoly, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
 
-
-fgdb <- "AK_Crab_Management_Areas.gdb"
-
-# List all feature classes in a file geodatabase
-subset(ogrDrivers(), grepl("GDB", name))
-fc_list <- ogrListLayers(fgdb)
-
-fc <- rgdal::readOGR(dsn=fgdb, layer="Alaska_Marine_Areas_AK_prj")
-fc2 <- spTransform(x = fc, CRS("+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs"))
-
-AKmngtArea <- st_as_sf(fc)
-AKmngtA <- st_transform(AKmngtArea, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
-
+nmfs <- st_read("shapefiles/gf95_nmfs/gf95_nmfs.shp")
 #All the information from ESR
 
 #Chukchi <- read_sf("shapefiles_code/Chukchi_Conner2019.shp")
@@ -60,24 +48,23 @@ WGOA <- read_sf("shapefiles/WGOA.shp")
 WGOA <- st_transform(x = WGOA, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
 
 
-nmfs <- AKmngtA %>% filter(NMFS_REP_AREA %in% c(610,620,630,640, 650)) %>% # subset to 610-650
-  dplyr::select(NMFS_REP_AREA, geometry)
+nmfs2 <- nmfs %>% filter(NMFS_AREA %in% c(610,620,630,640, 650)) %>% # subset to 610-650
+  dplyr::select(NMFS_AREA, geometry)
 
 
-akplots_v2 <- AKmngtA %>% 
-  drop_na(Ecosystem_Area) %>% 
+akplots_v2 <- nmfs %>% 
   ggplot()+
-  geom_sf(data= drop_na(nmfs),aes(color= NMFS_REP_AREA, geometry= geometry), fill=NA, color= "#999999", alpha=0.8)+
+  geom_sf(data= drop_na(nmfs2),aes(color= NMFS_AREA, geometry= geometry), fill=NA, color= "#999999", alpha=0.8)+
   #geom_sf(data=Chukchi, aes(fill= "Chukchi"), color= NA, alpha=0.5)+
-  geom_sf(data=EBS, aes(fill= "EBS"), color= NA, alpha=0.75)+
+  geom_sf(data=EBS, aes(fill= "EBS"), color= NA)+
   geom_sf(data=WGOA, aes(fill= "WGOA"), color= NA, alpha=0.75)+
   geom_sf(data=EGOA, aes(fill= "EGOA"), color= NA, alpha=0.75)+
-  geom_sf(data=NBS, aes(fill= "NBS"), color= NA, alpha=0.75)+
+  geom_sf(data=NBS, aes(fill= "NBS"), color= NA)+
   #geom_sf_pattern(data=WGOA, aes(pattern_type="WGOA"), pattern = 'magick',pattern_fill = "#E69F00",  pattern_alpha=0.6, color="#E69F00", fill=NA)+
   #geom_sf_pattern(data=EGOA, aes(pattern_type="EGOA"), pattern = 'magick',pattern_density= 0.01, pattern_fill = "#E69F00", pattern_alpha=0.6, color="#E69F00", fill=NA)+
   geom_sf(data=AKpoly,  fill= "#999999", color= NA, alpha=0.5)+
-  geom_sf_text(data= drop_na(nmfs, NMFS_REP_AREA),
-               aes(label = NMFS_REP_AREA),
+  geom_sf_text(data= drop_na(nmfs2, NMFS_AREA),
+               aes(label = NMFS_AREA),
                size = 2,
                hjust = 0.5, 
                color= "#333333"
