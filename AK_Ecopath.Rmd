@@ -1,0 +1,477 @@
+---
+title: "AK_Ecopath"
+author: "Bia Dias"
+date: "3/30/2022"
+output: 
+  powerpoint_presentation:
+  widescreen: true
+---
+
+```{r setup, include=FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#url <- "https://download.r-forge.r-project.org/bin/windows/contrib/4.4/rgdal_1.6-7.zip"
+#install.packages(url, type="source", repos=NULL)
+
+library(rgdal)
+library(rbgm)
+library(sf)
+library(ggplot2)
+library(here)
+library(tidyverse)
+library(ggrepel)
+library(ggpattern)
+
+
+```
+
+## AK ecosystem modeling working group
+
+Modeling group for Ecopath and Atlantis 
+
+## Model and data domains
+
+- Alaska Marine Areas from the ecosystem status report - Bridget
+- Atlantis model - Alberto
+- Prince William Sound - Bia
+- Central Gulf of Alaska - Bia
+- Chukchi Sea - Andy
+- Eastern Bering Sea - Andy
+- Western GOA - Bridget
+- Eastern GOA - Szymon
+
+
+
+```{r AK_ESR, echo = FALSE, warning = FALSE, include=FALSE}
+
+#Alaska polygon
+AKpoly <- read_sf("shapefiles/AKpoly.shp")
+AKpoly <- st_transform(x = AKpoly, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+fgdb <- "AK_Crab_Management_Areas.gdb"
+
+# List all feature classes in a file geodatabase
+subset(ogrDrivers(), grepl("GDB", name))
+fc_list <- ogrListLayers(fgdb)
+
+fc <- readOGR(dsn=fgdb,layer="Alaska_Marine_Areas_AK_prj")
+
+fc2 <- spTransform(x = fc, CRS("+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs"))
+
+AKmngtArea <- st_as_sf(fc2)
+AKmngtA <- st_transform(AKmngtArea, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+#All the information from ESR
+
+
+```
+
+## Data domains
+
+```{r AK_ESR2, warning = FALSE, out.width="90%"}
+plot(AKmngtArea)
+```
+
+
+```{r Atlantis, echo=FALSE}
+
+## Atlantis model ####
+atlantis_bgm <- read_bgm('GOA_WGS84_V4_final.bgm') #Albi's extent 
+atlantis_box <- box_sf(atlantis_bgm) # turn bgm to sf
+atlantis_crs <- atlantis_bgm$extra$projection # custom CRS
+
+atlantis_box2 <- st_transform(atlantis_box, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+
+#Old mask by me
+atla <- atlantis_box %>%  st_transform(4326)
+#WGOA <- st_crop(atla
+#                    , xmin = -170, xmax = -147, ymin = 50, ymax = 60)
+#WGOAaea <- st_transform(WGOA, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+#
+#EGOA <- st_crop(atla
+#                , xmin = -147, xmax = -125, ymin = 50, ymax = 60)
+#
+#EGOAaea <- st_transform(EGOA, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+#
+
+```
+
+## Area Type_ All Areas
+
+```{r AK_ESR3, warning = FALSE, out.width="100%"}
+akplots_area_type <- ggplot()+
+  geom_sf(data=AKmngtA, aes(fill= Area_Type), color= NA, alpha=0.4)+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  scale_fill_manual(values= c("ADFG Stat Area"="#999999", 
+                              "BSIERP Region"="#56B4E9", 
+                              "Ecosystem Area"="#009E73", 
+                              "Ecosystem Subarea"="#F0E442", 
+                              "Ecosystem Area Inside"="#0072B2", 
+                              "Ecosystem Subarea Inside"="#D55E00", 
+                              "NMFS Reporting Area"="#CC79A7"))+
+  coord_sf()
+
+akplots_area_type 
+
+```
+
+## Ecosystem Areas
+
+```{r AK_ESR4, warning = FALSE, out.width="100%"}
+akplots_Eco_Area <- ggplot()+
+  geom_sf(data=AKmngtA, aes(fill= Ecosystem_Area), color= NA, alpha=0.3)+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  scale_fill_manual(values= c("NA"="#999999", 
+                              "Aleutian Islands"="#56B4E9", 
+                              "Arctic"="#009E73", 
+                              "Eastern Bering Sea"="#F0E442", 
+                              "Gulf of Alaska"="#0072B2"))+
+  coord_sf()
+
+akplots_Eco_Area
+
+```
+
+## NMFS Areas
+
+```{r AK_ESR5, warning = FALSE, out.width="100%"}
+akplots_NMFS_Area <- AKmngtA %>% 
+  drop_na(NMFS_REP_AREA) %>% 
+  ggplot()+
+  geom_sf(aes(color= NMFS_REP_AREA, geometry= geometry), fill="#999999", color= "#757575", alpha=0.8)+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  geom_sf_text(
+    aes(label = NMFS_REP_AREA),
+    size = 2,
+    hjust = 0.5, 
+    color= "white"
+  )+
+  xlab("") + 
+  ylab("") +
+  coord_sf()
+
+akplots_NMFS_Area
+```
+
+
+```{r BS_CS_EwEs, warning= FALSE, echo=FALSE}
+
+
+#Chukchi <- read_sf("bering-sea-spatial-main_NOAA/shapefiles/Chukchi_Conner2019.shp")
+#Chukchi <- st_transform(x = Chukchi, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+NBS <- read_sf("bering-sea-spatial-main_NOAA/shapefiles/nebs_strata.shp")
+NBS <- st_transform(x = NBS, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+EBS <- read_sf("bering-sea-spatial-main_NOAA/shapefiles/mips.shp")
+EBS <- st_transform(x = EBS, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+EGOA <- read_sf("Ecopath_models_mask_Albi/EGOA.shp")
+EGOA <- st_transform(x = EGOA, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+WGOA <- read_sf("Ecopath_models_mask_Albi/WGOA.shp")
+WGOA <- st_transform(x = WGOA, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+
+```
+
+```{r AK_ESR6, echo=FALSE, warning= FALSE}
+
+
+### PWS - Eastern
+PWS_E <- read_sf("PWS_Shapefiles_Bia/PWSeastern_Project.shp")
+PWS_E <- st_transform(x = PWS_E, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+#plot(PWS_E)
+
+
+### PWS - Western
+PWS_W <- read_sf("PWS_Shapefiles_BIA/PWSwestern_Project.shp")
+PWS_W <- st_transform(x = PWS_W, "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+#plot(PWS_W)
+
+# PWS 
+PWS <- dplyr::bind_rows(list(PWS_E,PWS_W))
+
+#Old central goa mask
+#CGOAbd <- drop_na(AKmngtA, NMFS_REP_AREA)
+#CGOAbd_v2 <-  CGOAbd[CGOAbd$NMFS_REP_AREA == c(630,640), ]
+##CGOAbd_v3 <- CGOA_v2%>%  st_transform(4326) #to know the boundaries of 630 and 640 and crop from atlantis
+#CGOA <- st_crop(atla
+#                , xmin = -154.2662, xmax = -139.9997, ymin = 50, ymax = 60)
+
+CGOA <- read_sf("Ecopath_models_mask_Albi/CGOA.shp")
+CGOA_v2 <- st_transform(CGOA, crs = "+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
+```
+
+## PWS model and LTER stations
+
+```{r PWS_LTER, out.width="100%", warning=FALSE}
+
+lter <- st_read("LTER_stations_TK.csv", options=c("longitude=x","latitude=y"))
+#%>%filter(str_detect(station, 'PWS|IB|HB|MS|CG|1B|KI'))
+lter <- st_as_sf(lter, coords = c("longitude", "latitude"), crs = 4326)
+
+kerri <- st_read("C:/Users/biads/Dropbox/A_GWA/A_PWS_PAPER/PWS_EwE/DATA/Kerri_data_LTER/PWS_Chl_1997-2021_stations.csv", options=c("longitude=Longitude","latitude=Latitude"))%>%
+  filter(str_detect(Station, 'KIP1|KIP2|KIP3|MS4|MS3|MS2|MS1|PWSW2|PWSW3|PWSW4|PWSW5|PWSW6|PWSW7|HB1|HB2|HB3|HB4|HB5|NI4|NI3|NI2|NI1|PWSW1|PWS11|PWS10|PWS9|PWS8|PWS7|PWS6|PWS5|PWS4|PWS3|PWS2|PWS1|MH1|MH2|MH3|MH4|PWS-2|PWSW3|CG2|PWSA|PWSB|PWSC|PWSE|IB0|IB1|IB2|CG1|KIP0|PWSF|PWSD|CG0|KIP2Prod|KIP2|PWS1|PWS2|KIP2|HB3|PSWE|PSW2'))
+kerri <- st_as_sf(kerri, coords = c("Longitude", "Latitude"), crs = 4326)
+
+
+#nmfs <- st_read("Ecopath_models_mask_Albi/data/shapefiles/gf95_nmfs/gf95_nmfs.shp")
+nmfs <- AKmngtA %>% filter(NMFS_REP_AREA %in% c(620,630,640,649)) %>% # subset to 610-650
+  dplyr::select(NMFS_REP_AREA, geometry)
+#Using the NMFS bbox
+#coast <- map("worldHires", regions = "USA", plot = FALSE, fill = TRUE)
+#coast <- coast %>% st_as_sf() %>% st_transform(crs = st_crs(nmfs)) %>% st_crop(st_bbox(nmfs))
+#coast <- coast %>%  st_transform(4326)
+
+PWS_box <- PWS %>%  st_transform(4326)
+#Using PWS bbox
+AKpoly2 <- AKpoly %>% st_as_sf() %>% st_transform(crs = st_crs(PWS)) %>% st_crop(st_bbox(PWS))
+
+
+PWS_plot <- AKpoly2 %>% 
+  ggplot()+
+  geom_sf(fill="gray", color="gray", alpha=0.5)+
+  geom_sf(data=PWS, aes(fill="PWS"), color= NA, alpha=0.8)+
+  geom_sf(data= lter)+
+  #geom_sf(data= kerri)+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  geom_sf_text(data= drop_na(lter, station),
+               aes(label = station),
+    size = 2,
+    hjust = 1,
+    vjust=1.5,
+    color= "red")+
+ # geom_sf_text(data= drop_na(kerri, Station),
+ #   aes(label = Station),
+ #   size = 2,
+ #   hjust = 1,
+ #   vjust=1.5,
+ #   color= "black")+
+  xlab("") + 
+  ylab("") +
+  coord_sf()
+
+```
+
+## LTER stations
+
+```{r LTER, out.width="100%", warning=FALSE}
+
+
+sfc_as_cols <- function(x, names = c("x","y")) {
+  stopifnot(inherits(x,"sf") && inherits(sf::st_geometry(x),"sfc_POINT"))
+  ret <- sf::st_coordinates(x)
+  ret <- tibble::as_tibble(ret)
+  stopifnot(length(names) == ncol(ret))
+  x <- x[ , !names(x) %in% names]
+  ret <- setNames(ret,names)
+  dplyr::bind_cols(x,ret)
+}
+
+lter_all <- st_read("LTER_stations_TK.csv", options=c("longitude=x","latitude=y"))
+lter_all <- st_as_sf(lter_all, coords = c("longitude", "latitude"), crs = 4326)
+
+lter_all2 <- sfc_as_cols(lter_all)
+
+#nmfs <- st_read("Ecopath_models_mask_Albi/data/shapefiles/gf95_nmfs/gf95_nmfs.shp")
+nmfs <- AKmngtA %>% filter(NMFS_REP_AREA %in% c(630,640,649)) %>% # subset to 610-650
+  select(NMFS_REP_AREA, geometry)
+
+#Using PWS bbox
+AKpoly3 <- AKpoly %>% st_as_sf() %>% st_transform(crs = st_crs(nmfs)) %>% st_crop(st_bbox(nmfs))
+
+
+lter_plot <- AKpoly3 %>% 
+  ggplot()+
+  geom_sf(fill="gray", color="gray", alpha=0.5)+
+  #geom_sf(data=PWS, aes(fill="PWS"), color= NA, alpha=0.8)+
+  geom_sf(data= lter_all2)+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  geom_sf_text(data= drop_na(lter_all2, station),
+    aes(label = station),
+    size = 2,
+    hjust = 1,
+    vjust=1.5,
+    color= "black")+
+  xlab("") + 
+  ylab("") +
+  coord_sf()
+
+lter_plot+ geom_text_repel(data=lter_all2, aes(x= x, y=y, label=station))
+
+```
+
+
+## Ecosystem model and NMFS areas
+
+```{r AK_plot_result, out.width="100%", warning=FALSE}
+library(magick)
+
+nmfs <- AKmngtA %>% filter(NMFS_REP_AREA %in% c(610,620,630,640, 650)) %>% # subset to 610-650
+  dplyr::select(NMFS_REP_AREA, geometry)
+
+
+akplots_v2 <- AKmngtA %>% 
+  drop_na(Ecosystem_Area) %>% 
+  ggplot()+
+  geom_sf(data= drop_na(nmfs),aes(color= NMFS_REP_AREA, geometry= geometry), fill=NA, color= "#999999", alpha=0.8)+
+  geom_sf(data=AKpoly,  fill= "#999999", color= NA, alpha=0.5)+
+  geom_sf_text(data= drop_na(nmfs, NMFS_REP_AREA),
+    aes(label = NMFS_REP_AREA),
+    size = 2,
+    hjust = 0.5, 
+    color= "#333333"
+  )+
+  #geom_sf(aes(fill= Ecosystem_Area), color= "#888888", alpha=0.2)+
+  #geom_sf(data=atlantis_box2, aes(fill="Atlantis"), color= NA, alpha=0.8)+
+  #geom_sf(data=PWS, aes(fill="PWS"), color= NA, alpha=0.8)+
+  #geom_sf(data=CGOA_v2, aes(fill= "NGOA"), color= NA, alpha=0.9)+
+  #geom_sf(data=Chukchi, aes(fill= "Chukchi"), color= NA, alpha=0.5)+
+  geom_sf(data=EBS, aes(fill= "EBS"), color= NA)+
+  geom_sf(data=WGOA, aes(fill= "WGOA"), color= NA, alpha=0.75)+
+  geom_sf(data=EGOA, aes(fill= "EGOA"), color= NA, alpha=0.75)+
+  geom_sf(data=NBS, aes(fill= "NBS"), color= NA)+
+  #geom_sf(data= lter)+
+  #geom_sf(data= kerri)+
+  #geom_sf_pattern(data=WGOA, aes(pattern_type="WGOA"), pattern = 'magick',pattern_fill = "#E69F00",  pattern_alpha=0.6, color="#E69F00", fill=NA)+
+  #geom_sf_pattern(data=EGOA, aes(pattern_type="EGOA"), pattern = 'magick',pattern_density= 0.01, pattern_fill = "#E69F00", pattern_alpha=0.6, color="#E69F00", fill=NA)+
+    theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  #geom_sf_text(data= drop_na(lter, station),
+  #             aes(label = station),
+  #  size = 2,
+  #  hjust = 1,
+  #  vjust=1.5,
+  #  color= "red")+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  xlab("") + 
+  ylab("") +
+  scale_fill_manual(values= c( "WGOA"= "#E69F00",
+                              #"PWS"="#D55E00",
+                              "EGOA"= "#009E73",
+                              #"EGOA" ="#999933",
+                              #"Chukchi"="#0072B2", 
+                              "NBS"="#0072B2", 
+                              "EBS"="#56B4E9" 
+                              #"Central_GOA" = "#CC79A7",
+                              #"Eastern Bering Sea"="#F0E442", 
+                              #"Gulf of Alaska"="#0072B2"
+                              ))+
+  #scale_pattern_type_manual(values = c("WGOA"="left30", 
+  #                                     "EGOA"="right45")) +
+   labs( x = "", y = "", fill = " ", pattern_type=" ") +
+  
+  coord_sf()
+  
+  
+akplots_v2
+ggsave( "FIGURES/EWE_ak_plots.png", akplots_v2, height=4, width=8, dpi = 600)
+```
+
+## Ecosystem model, LTER and NMFS areas for PWS
+
+```{r AK_plot_result_v2, out.width="100%", warning=FALSE}
+
+nmfs <- AKmngtA %>% filter(NMFS_REP_AREA %in% c(610,620,630,640,649, 650)) %>% # subset to 610-650
+  dplyr::select(NMFS_REP_AREA, geometry)
+
+
+akplots_v3 <- AKmngtA %>% 
+  drop_na(Ecosystem_Area) %>% 
+  ggplot()+
+  geom_sf(data= drop_na(nmfs),aes(color= NMFS_REP_AREA, geometry= geometry), fill=NA, color= "grey", alpha=0.8)+
+  geom_sf(data=atlantis_box2, aes(fill="Atlantis"), color= NA, alpha=0.8)+ 
+  geom_sf(data=PWS, aes(fill="PWS"), color= NA, alpha=0.8)+
+  geom_sf(data=CGOA_v2, aes(fill= "NGOA"), color= NA, alpha=0.9)+
+  geom_sf(data= lter, size=0.5)+
+  geom_sf_pattern(data=WGOA, aes(pattern_type="WGOA"), pattern = 'magick',pattern_fill = "#E69F00",  pattern_alpha=0.6, color="#E69F00", fill=NA)+
+  geom_sf_pattern(data=EGOA, aes(pattern_type="EGOA"), pattern = 'magick',pattern_density= 0.01, pattern_fill = "#E69F00", pattern_alpha=0.6, color="#E69F00", fill=NA)+
+  #geom_sf(data=AKpoly,  fill= "#999999", color= NA, alpha=0.5)+
+  geom_sf_text(data= drop_na(nmfs),
+    aes(label = NMFS_REP_AREA),
+    size = 3,
+    hjust = 0.5, 
+    color= "black"
+  )+
+    theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                        linetype = "dashed", size = 0.5))+
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "#cccccc", 
+                                    linetype = "dashed", size = 0.5))+
+  xlab("") + 
+  ylab("") +
+  scale_fill_manual(values= c( "PWS"= "#D55E00",
+                              "Atlantis"="#E69F00",
+                              "NGOA"= "#009E73"))+
+   scale_pattern_type_manual(values = c("WGOA"="left30", 
+                                        "EGOA"="right45")) +
+   labs( x = "", y = "", fill = " ", pattern_type=" ") +
+  
+  coord_sf()
+  
+  
+akplots_v3
+```
+
+## Survey responses
+
+## What is your main goal and what do you aim to achieve with your modeling approach? (e.g., model purpose, model hypothesis).
+
+- Bia: 
+    1. How marine heatwaves affect the marine ecosystem resistance and resilience. 
+    2. In addition my main question, I want to explore what takes to recover Pacific herring populations.
+- Albi:
+    1. To model ecosystem-level effects of past and future climate events
+- Andy: 
+    1. Evaluate structure/function of the food web, gap analysis, resilience to perturbations
+
+
+## What is your main goal. cnt.
+
+  - Bridget:
+    1. Spatially align WCGOA Ecopath model to GOA-CLIM for future model comparison studies
+    2. Update biomass, catch, ROMs 10km (temperature, phytoplankton, zooplankton) time series to perform hindcasts/forecasts on environmental relationships and food web dynamics through time including marine heatwave time periods (2014-2019)
+    3. Add temperature functions (consumption and respiration) to address temperature dependent changes in food web dynamics
+    4. Inform groundfish Fisheries Management Process through the Ecosystem Status Report by providing modeled syntheses and indicators of food web structure and dynamics 
+    5. Automate model updates & Accessible & Applied (Github, etc)
+    6. Set up model for future model comparison/ multi-model approaches through GOA-CLIM 
+    
+## What is your main goal. cnt.
+
+  - Szymon
+    1. quantify and analyze the structure of the eastern Gulf of Alaska ecosystem
+    2. hindcast ecosystem dynamics in the eastern Gulf of Alaska iii) forecast these ecosystem dynamics under several climate change and fisheries management scenarios
+    3. compare ecosystem structure and dynamics in the eastern vs. central and western Gulf of Alaska ecosystem (Bridget's model) and in Ecopath vs. Atlantis (Albi's model).
+
+
+## Are you using any forcing function? If so, what are the forcing functions being used? 
+
+- Bia: 
+    DFA generated forcing functions
+- Bridget:
+    1. Temperature
+    2. Phytoplankton
+    3. Catch
+    4. Diet maybe future"
+- Albi:
+    (interpreting "forcing" in an Atlantis context) ROMS daily data for temperature, salinity, water transport, solar radiation. Catch from AKFIN.
+- Szymon
+    I will be using a temperature time series to allow species to respond to climate conditions according to their thermal niche parameters.
+
